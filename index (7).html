@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>3D Drag & Drop Builder — MVP</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --bg:#F7F7F8;
+      --panel:#0F172A;
+      --muted:#CBD5E1;
+      --accent:#3B82F6;
+      --panel-2:#111827;
+      --card-radius:12px;
+      --gap:12px;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    html,body{height:100%;margin:0;background:var(--bg);color:#0f172a;}
+    .app {
+      display:grid;
+      grid-template-rows:56px 1fr;
+      height:100vh;
+      gap:8px;
+    }
+    /* Top Bar */
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0 16px;
+      background:linear-gradient(#fff,#f3f4f6);
+      border-bottom:1px solid rgba(15,23,42,0.04);
+      box-shadow:0 1px 0 rgba(15,23,42,0.03);
+    }
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{
+      width:34px;height:34px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;
+    }
+    .controls {display:flex;align-items:center;gap:8px}
+    button.btn{
+      background:var(--accent);color:white;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;
+    }
+    button.ghost{background:transparent;color:var(--panel-2);border:1px solid rgba(15,23,42,0.06);padding:8px 10px;border-radius:8px;}
+    /* Main area */
+    .main {
+      display:grid;
+      grid-template-columns:260px 1fr 320px;
+      gap:12px;
+      padding:12px;
+      align-items:stretch;
+    }
+    .panel {
+      background:white;border-radius:var(--card-radius);box-shadow:0 6px 18px rgba(2,6,23,0.06);padding:12px;display:flex;flex-direction:column;
+    }
+    .sidebar .section-title{font-weight:700;margin-bottom:8px}
+    .element{
+      display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;margin-bottom:8px;border:1px dashed rgba(2,6,23,0.04);cursor:grab;
+      user-select:none;
+    }
+    .element:hover{background:rgba(59,130,246,0.04)}
+    .element .icon{width:36px;height:36;border-radius:8px;display:flex;align-items:center;justify-content:center;background:#f1f5f9}
+    .canvas-wrap{position:relative;min-height:60vh;overflow:hidden;border-radius:12px;background:#1E1E1E;display:flex;flex-direction:column;}
+    /* canvas top actions */
+    .canvas-top{display:flex;justify-content:flex-end;gap:8px;padding:10px}
+    .canvas-area{flex:1;position:relative;display:block}
+    canvas {width:100%;height:100%;display:block;outline:none}
+    /* right panel */
+    .props .row{display:flex;flex-direction:column;margin-bottom:8px}
+    label{font-size:13px;color:#111827;margin-bottom:6px}
+    input[type="number"], input[type="text"], select{padding:8px;border-radius:8px;border:1px solid #e6e9ee}
+    .muted{color:var(--muted);font-size:13px}
+    .toolbar{display:flex;gap:6px}
+    .export-area{display:flex;gap:8px;align-items:center}
+    .footer-note{font-size:12px;color:#64748b;margin-top:6px}
+    .selected { outline: 2px solid rgba(59,130,246,0.18); }
+    .kbd { font-family: monospace; background:#0f172a;color:white;padding:2px 6px;border-radius:4px;font-size:12px;}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo">3D</div>
+        <div>
+          <div style="font-weight:700">Covimos 3D Builder (MVP)</div>
+          <div style="font-size:12px;color:#64748b">Drag & drop • Export HTML • Transform gizmos</div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="muted" id="saveStatus">Not saved</div>
+        <button class="ghost" id="undoBtn">Undo</button>
+        <button class="ghost" id="redoBtn">Redo</button>
+        <button class="btn" id="exportBtn">Export HTML</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <!-- Left Sidebar -->
+      <div class="panel sidebar">
+        <div class="section-title">Elements</div>
+
+        <div id="itemsList" style="overflow:auto;padding-right:6px">
+          <div class="element" draggable="true" data-type="box">
+            <div class="icon">▢</div>
+            <div>
+              <div style="font-weight:700">Cube</div>
+              <div class="muted" style="font-size:12px">Basic box geometry</div>
+            </div>
+          </div>
+
+          <div class="element" draggable="true" data-type="sphere">
+            <div class="icon">◯</div>
+            <div>
+              <div style="font-weight:700">Sphere</div>
+              <div class="muted" style="font-size:12px">Smooth sphere</div>
+            </div>
+          </div>
+
+          <div class="element" draggable="true" data-type="plane">
+            <div class="icon">▭</div>
+            <div>
+              <div style="font-weight:700">Plane</div>
+              <div class="muted" style="font-size:12px">Flat surface</div>
+            </div>
+          </div>
+
+          <div class="element" draggable="true" data-type="text">
+            <div class="icon">T</div>
+            <div>
+              <div style="font-weight:700">3D Text</div>
+              <div class="muted" style="font-size:12px">Simple extruded text</div>
+            </div>
+          </div>
+
+          <div style="height:12px"></div>
+          <div class="section-title">Lights</div>
+
+          <div class="element" draggable="true" data-type="ambientLight">
+            <div class="icon">☼</div>
+            <div>
+              <div style="font-weight:700">Ambient Light</div>
+              <div class="muted" style="font-size:12px">Soft, global light</div>
+            </div>
+          </div>
+
+          <div class="element" draggable="true" data-type="directionalLight">
+            <div class="icon">⇢</div>
+            <div>
+              <div style="font-weight:700">Directional Light</div>
+              <div class="muted" style="font-size:12px">Sun-like shadow light</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:1"></div>
+        <div class="footer-note">Tip: drag an element into the canvas area. Use G to toggle gizmo mode.</div>
+      </div>
+
+      <!-- Canvas -->
+      <div class="panel canvas-wrap">
+        <div class="canvas-top">
+          <div class="toolbar">
+            <button class="ghost" id="moveBtn">Move</button>
+            <button class="ghost" id="rotateBtn">Rotate</button>
+            <button class="ghost" id="scaleBtn">Scale</button>
+            <button class="ghost" id="snapBtn">Snap: off</button>
+          </div>
+        </div>
+
+        <div class="canvas-area" id="canvasArea">
+          <canvas id="threeCanvas" tabindex="0"></canvas>
+        </div>
+      </div>
+
+      <!-- Right Sidebar (Properties) -->
+      <div class="panel props">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-weight:700">Properties</div>
+          <div class="muted">Selected: <span id="selectedName">None</span></div>
+        </div>
+
+        <div id="propsContent">
+          <div class="row">
+            <label>Position</label>
+            <div style="display:flex;gap:8px">
+              <input type="number" id="posX" step="0.1" placeholder="X">
+              <input type="number" id="posY" step="0.1" placeholder="Y">
+              <input type="number" id="posZ" step="0.1" placeholder="Z">
+            </div>
+          </div>
+
+          <div class="row">
+            <label>Rotation (deg)</label>
+            <div style="display:flex;gap:8px">
+              <input type="number" id="rotX" step="1" placeholder="X">
+              <input type="number" id="rotY" step="1" placeholder="Y">
+              <input type="number" id="rotZ" step="1" placeholder="Z">
+            </div>
+          </div>
+
+          <div class="row">
+            <label>Scale</label>
+            <div style="display:flex;gap:8px">
+              <input type="number" id="scaleX" step="0.1" placeholder="X" value="1">
+              <input type="number" id="scaleY" step="0.1" placeholder="Y" value="1">
+              <input type="number" id="scaleZ" step="0.1" placeholder="Z" value="1">
+            </div>
+          </div>
+
+          <div class="row">
+            <label>Color</label>
+            <input type="color" id="colorPicker" value="#ff6600">
+          </div>
+
+          <div style="height:12px"></div>
+          <div class="export-area">
+            <button class="btn" id="downloadBtn">Download HTML</button>
+            <button class="ghost" id="copyBtn">Copy Code</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+  // Note: This demo imports Three.js and helpers from CDN.
+  // It is written to be simple and clear for an MVP.
+  import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+  import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js';
+  import { TransformControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/TransformControls.js';
+  import { FontLoader } from 'https://unpkg.com/three@0.158.0/examples/jsm/loaders/FontLoader.js';
+  import { TextGeometry } from 'https://unpkg.com/three@0.158.0/examples/jsm/geometries/TextGeometry.js';
+
+  // Basic scene setup
+  const canvas = document.getElementById('threeCanvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(canvas.clientWidth || 800, canvas.clientHeight || 600, false);
+  renderer.setClearColor(0x1e1e1e);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, 2, 0.1, 1000);
+  camera.position.set(3, 3, 6);
+
+  const orbit = new OrbitControls(camera, renderer.domElement);
+  orbit.enableDamping = true;
+
+  // Grid floor
+  const grid = new THREE.GridHelper(20, 40, 0x2a2a2a, 0x111111);
+  scene.add(grid);
+
+  // Default light
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
+  scene.add(hemi);
+
+  const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+  dir.position.set(5, 10, 7);
+  dir.castShadow = true;
+  scene.add(dir);
+
+  // Transform controls
+  const transform = new TransformControls(camera, renderer.domElement);
+  transform.addEventListener('dragging-changed', function (event) {
+    orbit.enabled = !event.value;
+  });
+  scene.add(transform);
+
+  // State
+  let objects = [];
+  let selected = null;
+  let gizmoMode = 'translate';
+  transform.setMode(gizmoMode);
+
+  // Helpers
+  function createMesh(type){
+    let mesh;
+    const material = new THREE.MeshStandardMaterial({ color: 0xff6600 });
+    if(type === 'box'){
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), material);
+    } else if(type === 'sphere'){
+      mesh = new THREE.Mesh(new THREE.SphereGeometry(0.6, 32, 32), material);
+    } else if(type === 'plane'){
+      mesh = new THREE.Mesh(new THREE.PlaneGeometry(2,2), material);
+      mesh.rotation.x = -Math.PI/2;
+    } else if(type === 'text'){
+      // simple fallback text as box until font loads
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.6,0.3), material);
+      // try to replace with actual 3D text
+      const loader = new FontLoader();
+      loader.load('https://unpkg.com/three@0.158.0/examples/fonts/helvetiker_regular.typeface.json', function (font) {
+        const geo = new TextGeometry('Text', { font: font, size: 0.6, height: 0.15 });
+        geo.center();
+        const textMat = new THREE.MeshStandardMaterial({ color: 0xff6600 });
+        const textMesh = new THREE.Mesh(geo, textMat);
+        textMesh.position.copy(mesh.position);
+        textMesh.rotation.copy(mesh.rotation);
+        scene.remove(mesh);
+        mesh = textMesh;
+        scene.add(mesh);
+        objects.push(mesh);
+      });
+    } else if(type === 'ambientLight'){
+      const light = new THREE.AmbientLight(0xffffff, 0.7);
+      light.name = 'AmbientLight';
+      return light;
+    } else if(type === 'directionalLight'){
+      const l = new THREE.DirectionalLight(0xffffff, 1);
+      l.position.set(5,10,5);
+      l.name = 'DirectionalLight';
+      return l;
+    } else {
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), material);
+    }
+    mesh.name = type + '_' + (Math.random().toString(36).substr(2,5));
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  }
+
+  // Resize handling
+  function resizeRendererToDisplaySize() {
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    if (canvas.width !== Math.floor(width * window.devicePixelRatio) || canvas.height !== Math.floor(height * window.devicePixelRatio)) {
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    }
+  }
+
+  // Render loop
+  function animate() {
+    resizeRendererToDisplaySize();
+    orbit.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+
+  // Drag and drop from sidebar
+  const items = document.querySelectorAll('.element');
+  items.forEach(el => {
+    el.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', el.dataset.type);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+  });
+
+  const canvasArea = document.getElementById('canvasArea');
+  canvasArea.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    canvasArea.style.boxShadow = 'inset 0 0 0 3px rgba(59,130,246,0.08)';
+  });
+  canvasArea.addEventListener('dragleave', e => {
+    canvasArea.style.boxShadow = 'none';
+  });
+  canvasArea.addEventListener('drop', e => {
+    e.preventDefault();
+    canvasArea.style.boxShadow = 'none';
+    const type = e.dataTransfer.getData('text/plain');
+    const mesh = createMesh(type);
+    // place near center; could compute cursor -> world later
+    mesh.position.set(0, 1, 0);
+    scene.add(mesh);
+    objects.push(mesh);
+    selectObject(mesh);
+    setSaved(false);
+  });
+
+  // Selection by click
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  canvas.addEventListener('pointerdown', (ev) => {
+    canvas.focus();
+    if (ev.button !== 0) return;
+    const rect = canvas.getBoundingClientRect();
+    pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(objects, true);
+    if (hits.length) {
+      selectObject(hits[0].object);
+    } else {
+      // deselect
+      selectObject(null);
+    }
+  });
+
+  function selectObject(obj){
+    if (selected === obj) return;
+    if (selected && selected.material && selected.material.emissive) {
+      selected.material.emissive.setHex(0x000000);
+    }
+    selected = obj;
+    if (selected) {
+      transform.attach(selected);
+      document.getElementById('selectedName').textContent = selected.name || 'Object';
+      // highlight
+      if (selected.material && selected.material.emissive) selected.material.emissive.setHex(0x111111);
+      // update props UI
+      updatePropsUI(selected);
+    } else {
+      transform.detach();
+      document.getElementById('selectedName').textContent = 'None';
+      clearPropsUI();
+    }
+  }
+
+  // Props UI bindings
+  const posX = document.getElementById('posX');
+  const posY = document.getElementById('posY');
+  const posZ = document.getElementById('posZ');
+  const rotX = document.getElementById('rotX');
+  const rotY = document.getElementById('rotY');
+  const rotZ = document.getElementById('rotZ');
+  const scaleX = document.getElementById('scaleX');
+  const scaleY = document.getElementById('scaleY');
+  const scaleZ = document.getElementById('scaleZ');
+  const colorPicker = document.getElementById('colorPicker');
+
+  function updatePropsUI(obj){
+    if(!obj) return;
+    posX.value = obj.position.x.toFixed(2);
+    posY.value = obj.position.y.toFixed(2);
+    posZ.value = obj.position.z.toFixed(2);
+    rotX.value = THREE.MathUtils.radToDeg(obj.rotation.x).toFixed(0);
+    rotY.value = THREE.MathUtils.radToDeg(obj.rotation.y).toFixed(0);
+    rotZ.value = THREE.MathUtils.radToDeg(obj.rotation.z).toFixed(0);
+    scaleX.value = obj.scale.x.toFixed(2);
+    scaleY.value = obj.scale.y.toFixed(2);
+    scaleZ.value = obj.scale.z.toFixed(2);
+    if (obj.material && obj.material.color) {
+      colorPicker.value = '#' + obj.material.color.getHexString();
+    }
+  }
+  function clearPropsUI(){
+    posX.value = posY.value = posZ.value = '';
+    rotX.value = rotY.value = rotZ.value = '';
+    scaleX.value = scaleY.value = scaleZ.value = '';
+  }
+
+  // apply props when changed
+  [posX,posY,posZ].forEach((el, idx) => el.addEventListener('change', () => {
+    if(!selected) return;
+    selected.position.set(parseFloat(posX.value||0), parseFloat(posY.value||0), parseFloat(posZ.value||0));
+    setSaved(false);
+  }));
+  [rotX,rotY,rotZ].forEach((el, idx) => el.addEventListener('change', () => {
+    if(!selected) return;
+    selected.rotation.set(
+      THREE.MathUtils.degToRad(parseFloat(rotX.value||0)),
+      THREE.MathUtils.degToRad(parseFloat(rotY.value||0)),
+      THREE.MathUtils.degToRad(parseFloat(rotZ.value||0))
+    );
+    setSaved(false);
+  }));
+  [scaleX,scaleY,scaleZ].forEach((el, idx) => el.addEventListener('change', () => {
+    if(!selected) return;
+    selected.scale.set(parseFloat(scaleX.value||1), parseFloat(scaleY.value||1), parseFloat(scaleZ.value||1));
+    setSaved(false);
+  }));
+  colorPicker.addEventListener('change', () => {
+    if(!selected || !selected.material) return;
+    selected.material.color.set(colorPicker.value);
+    setSaved(false);
+  });
+
+  // Gizmo buttons
+  document.getElementById('moveBtn').addEventListener('click', () => { gizmoMode='translate'; transform.setMode('translate'); });
+  document.getElementById('rotateBtn').addEventListener('click', () => { gizmoMode='rotate'; transform.setMode('rotate'); });
+  document.getElementById('scaleBtn').addEventListener('click', () => { gizmoMode='scale'; transform.setMode('scale'); });
+
+  // Snap toggle
+  let snap = false;
+  document.getElementById('snapBtn').addEventListener('click', (e) => {
+    snap = !snap;
+    transform.setTranslationSnap(snap ? 0.5 : null);
+    transform.setRotationSnap(snap ? THREE.MathUtils.degToRad(15) : null);
+    document.getElementById('snapBtn').textContent = 'Snap: ' + (snap ? 'on' : 'off');
+  });
+
+  // Keyboard shortcuts
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'g' || e.key === 'G') {
+      // cycle modes
+      if (gizmoMode === 'translate') { gizmoMode='rotate'; transform.setMode('rotate'); }
+      else if (gizmoMode === 'rotate') { gizmoMode='scale'; transform.setMode('scale'); }
+      else { gizmoMode='translate'; transform.setMode('translate'); }
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (selected) {
+        scene.remove(selected);
+        const idx = objects.indexOf(selected);
+        if (idx >= 0) objects.splice(idx,1);
+        selectObject(null);
+        setSaved(false);
+      }
+    }
+  });
+
+  // Export HTML
+  function generateExportHTML() {
+    // Simple export: minimal HTML with Three.js and objects serialized as JSON
+    const serialized = objects.map(o => {
+      // only simple mesh properties exported
+      const obj = {
+        name: o.name || '',
+        type: o.geometry ? o.geometry.type : (o.isLight ? 'Light' : 'Object'),
+        position: {x: o.position.x, y: o.position.y, z: o.position.z},
+        rotation: {x: o.rotation.x, y: o.rotation.y, z: o.rotation.z},
+        scale: {x: o.scale.x, y: o.scale.y, z: o.scale.z},
+        color: o.material && o.material.color ? o.material.color.getHexString() : null,
+      };
+      return obj;
+    });
+
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Exported 3D Scene</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>html,body{height:100%;margin:0;background:#111;color:#fff}canvas{display:block;width:100%;height:100%}</style>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+(async function(){
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(3,3,6);
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+  const hemi = new THREE.HemisphereLight(0xffffff,0x444444,0.7);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffffff,0.6);
+  dir.position.set(5,10,7);
+  scene.add(dir);
+
+  const objects = ${JSON.stringify(serialized, null, 2)};
+
+  objects.forEach(o=>{
+    let mesh;
+    const color = o.color ? ('#' + o.color) : '#ff6600';
+    if (o.type && o.type.includes('Box')) {
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshStandardMaterial({color}));
+    } else if (o.type && o.type.includes('Sphere')) {
+      mesh = new THREE.Mesh(new THREE.SphereGeometry(0.6,32,32), new THREE.MeshStandardMaterial({color}));
+    } else if (o.type && o.type.includes('Plane')) {
+      mesh = new THREE.Mesh(new THREE.PlaneGeometry(2,2), new THREE.MeshStandardMaterial({color}));
+      mesh.rotation.x = -Math.PI/2;
+    } else {
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshStandardMaterial({color}));
+    }
+    mesh.position.set(o.position.x, o.position.y, o.position.z);
+    mesh.rotation.set(o.rotation.x, o.rotation.y, o.rotation.z);
+    mesh.scale.set(o.scale.x, o.scale.y, o.scale.z);
+    scene.add(mesh);
+  });
+
+  function animate(){requestAnimationFrame(animate); renderer.render(scene,camera);}
+  animate();
+})();
+</script>
+</body>
+</html>`;
+    return html;
+  }
+
+  function download(filename, text) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], {type: 'text/html'}));
+    a.download = filename;
+    a.click();
+  }
+
+  document.getElementById('downloadBtn').addEventListener('click', () => {
+    const html = generateExportHTML();
+    download('scene-export.html', html);
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', async () => {
+    const html = generateExportHTML();
+    await navigator.clipboard.writeText(html);
+    alert('HTML copied to clipboard (you can paste into a file).');
+  });
+
+  // Simple save indicator
+  function setSaved(saved){
+    const el = document.getElementById('saveStatus');
+    el.textContent = saved ? 'Saved ✓' : 'Not saved';
+  }
+
+  // basic responsiveness
+  window.addEventListener('resize', () => {
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+    camera.aspect = canvas.clientWidth / canvas.clientHeight;
+    camera.updateProjectionMatrix();
+  });
+
+  // initialize with a test cube
+  const starter = createMesh('box');
+  starter.position.set(0, 0.5, 0);
+  scene.add(starter);
+  objects.push(starter);
+
+</script>
+</body>
+</html>
